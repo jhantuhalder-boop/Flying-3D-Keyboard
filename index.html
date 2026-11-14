@@ -1,0 +1,168 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Super 3D Flying Keyboard</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(150deg,#304c78,#080e21 75%);color:white;font-family:Arial,sans-serif;min-height:100vh}
+main{padding:16px;max-width:650px;margin:auto}
+h2{text-align:center;margin:18px 0 5px}
+.sub{text-align:center;color:#b8c8e7}
+#screen{width:100%;height:170px;border-radius:24px;background:white;color:#17243d;padding:20px;font-size:26px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:25px 0 15px;box-shadow:inset 0 4px 15px #a9b7cc}
+.controls,.languages,.row{display:flex;justify-content:center;gap:5px;margin:10px 0}
+button{cursor:pointer;touch-action:manipulation}
+.controls button,.languages button{background:#29456d;color:white;border:1px solid #829bc5;border-radius:12px;padding:12px;flex:1;font-size:15px}
+.languages .active{background:#69aaff;color:#07172e}
+.keyboard{padding:8px 4px 15px;border-radius:25px;background:linear-gradient(145deg,#30496e,#111d35);border:2px solid #526d98;box-shadow:0 12px 25px #050b19}
+.row{gap:4px;margin:7px 0}
+.key{flex:1;min-width:0;height:54px;border:1px solid #9bbce9;border-radius:11px;background:linear-gradient(#fff,#b6ccef 75%,#7699c8);box-shadow:0 5px 0 #54729e,0 7px 8px #071226;color:#122440;font-weight:bold;font-size:clamp(13px,4vw,22px);padding:0 2px}
+.key:active{transform:translateY(4px);box-shadow:0 1px 0 #54729e}
+.special{background:linear-gradient(#80c2ff,#3876ce);color:white}
+.wide{flex:4}
+#suggestions{display:flex;gap:6px;justify-content:center;min-height:42px;flex-wrap:wrap}
+#suggestions button{background:#253f65;color:white;border:1px solid #6d91c5;border-radius:9px;padding:8px}
+.fly{position:fixed;z-index:100;pointer-events:none;font-size:48px;font-weight:bold;color:#ffdf54;text-shadow:0 0 15px #ff3caa;animation:fly .65s ease-out forwards}
+@keyframes fly{to{transform:translate(var(--dx),var(--dy)) scale(1.6) rotate(20deg);opacity:0}}
+.spark{position:fixed;z-index:101;width:9px;height:9px;border-radius:50%;pointer-events:none;animation:burst .75s ease-out forwards}
+@keyframes burst{to{transform:translate(var(--x),var(--y)) scale(.2);opacity:0}}
+.note{text-align:center;color:#bdc9dd;font-size:13px;line-height:1.6;margin:22px 0}
+</style>
+</head>
+<body>
+<main>
+<h2>✨ Super 3D Flying Keyboard</h2>
+<div class="sub">Touch • Fly • Fireworks • Type</div>
+<div id="screen"></div>
+<div class="controls">
+<button onclick="copyText()">📋 Copy</button>
+<button onclick="shareText()">↗ Share</button>
+<button onclick="clearText()">✕ Clear</button>
+</div>
+<div class="languages">
+<button onclick="changeLang('en')" id="en" class="active">English</button>
+<button onclick="changeLang('hi')" id="hi">हिंदी</button>
+<button onclick="changeLang('bn')" id="bn">বাংলা</button>
+</div>
+<div id="suggestions"></div>
+<div class="keyboard" id="keyboard"></div>
+<p class="note">यह ब्राउज़र में चलने वाला कीबोर्ड है। Copy करके दूसरे ऐप में टेक्स्ट पेस्ट कर सकते हैं।</p>
+</main>
+<script>
+const layouts={
+en:["qwertyuiop","asdfghjkl","zxcvbnm"],
+hi:[
+["क","ख","ग","घ","च","छ","ज","झ","ट","ठ"],
+["ड","ढ","त","थ","द","ध","न","प","फ"],
+["ब","भ","म","य","र","ल","व","स","ह"]
+],
+bn:[
+["ক","খ","গ","ঘ","চ","ছ","জ","ঝ","ট","ঠ"],
+["ড","ঢ","ত","থ","দ","ধ","ন","প","ফ"],
+["ব","ভ","ম","য","র","ল","শ","স","হ"]
+]};
+let lang="en",shift=false,numbers=false;
+let value="";
+const screen=document.getElementById("screen");
+const keyboard=document.getElementById("keyboard");
+const suggestions=document.getElementById("suggestions");
+const words={
+en:["hello","thank you","good morning","welcome","please"],
+hi:["नमस्ते","धन्यवाद","आपका","स्वागत","शुभकामनाएँ"],
+bn:["নমস্কার","ধন্যবাদ","আপনার","স্বাগতম","শুভেচ্ছা"]
+};
+function changeLang(l){
+lang=l;shift=false;numbers=false;
+document.querySelectorAll(".languages button").forEach(b=>b.classList.toggle("active",b.id===l));
+render();
+}
+function add(t,el){
+value+=t;screen.textContent=value;
+animate(t,el);suggest();
+}
+function removeChar(){
+value=Array.from(value).slice(0,-1).join("");
+screen.textContent=value;suggest();
+}
+function clearText(){value="";screen.textContent="";suggest()}
+async function copyText(){
+try{await navigator.clipboard.writeText(value);alert("Copied!")}
+catch(e){alert("Copy उपलब्ध नहीं है। टेक्स्ट को चुनकर कॉपी करें।")}
+}
+async function shareText(){
+if(navigator.share){try{await navigator.share({text:value})}catch(e){}}
+else copyText();
+}
+function suggest(){
+suggestions.innerHTML="";
+const last=value.split(/\s/).pop().toLowerCase();
+if(!last)return;
+words[lang].filter(w=>w.toLowerCase().startsWith(last)&&w.toLowerCase()!==last).slice(0,3).forEach(w=>{
+let b=document.createElement("button");
+b.textContent=w;
+b.onclick=()=>{
+value=value.slice(0,-last.length)+w+" ";
+screen.textContent=value;suggest();
+};
+suggestions.appendChild(b);
+});
+}
+function animate(t,el){
+if(!el||!t.trim())return;
+const r=el.getBoundingClientRect();
+let x=r.left+r.width/2,y=r.top;
+let f=document.createElement("div");
+f.className="fly";f.textContent=t;
+f.style.left=x+"px";f.style.top=y+"px";
+f.style.setProperty("--dx",(innerWidth/2-x)+"px");
+f.style.setProperty("--dy",(-Math.min(y-80,220))+"px");
+document.body.appendChild(f);
+setTimeout(()=>f.remove(),700);
+const colors=["#ff367f","#ffe34b","#39e9ff","#8fff49","#b76aff","#ff922e"];
+for(let i=0;i<16;i++){
+let s=document.createElement("div");
+s.className="spark";
+s.style.left=x+"px";s.style.top=y+"px";
+s.style.background=colors[i%colors.length];
+let a=Math.PI*2*i/16;
+let d=45+Math.random()*75;
+s.style.setProperty("--x",Math.cos(a)*d+"px");
+s.style.setProperty("--y",Math.sin(a)*d+"px");
+document.body.appendChild(s);
+setTimeout(()=>s.remove(),800);
+}
+}
+function key(label,action,cls=""){
+let b=document.createElement("button");
+b.className="key "+cls;
+b.textContent=label;
+b.onclick=()=>action(b);
+return b;
+}
+function render(){
+keyboard.innerHTML="";
+let rows=numbers?["1234567890","@#$%&*-+/","()!?;:'\""]:layouts[lang];
+rows.forEach((row,i)=>{
+let div=document.createElement("div");div.className="row";
+if(i===2)div.appendChild(key("⇧",()=>{shift=!shift;render()},"special"));
+Array.from(row).forEach(ch=>{
+let c=lang==="en"&&shift?ch.toUpperCase():ch;
+div.appendChild(key(c,b=>{add(c,b);if(shift){shift=false;render()}}));
+});
+if(i===2)div.appendChild(key("⌫",removeChar,"special"));
+keyboard.appendChild(div);
+});
+let bottom=document.createElement("div");bottom.className="row";
+bottom.appendChild(key(numbers?"ABC":"123",()=>{numbers=!numbers;render()},"special"));
+bottom.appendChild(key("🌐",()=>changeLang(lang==="en"?"hi":lang==="hi"?"bn":"en"),"special"));
+bottom.appendChild(key("space",b=>add(" ",b),"wide"));
+bottom.appendChild(key(".",b=>add(".",b),"special"));
+bottom.appendChild(key("↵",b=>add("\n",b),"special"));
+keyboard.appendChild(bottom);
+}
+render();
+</script>
+</body>
+</html>
