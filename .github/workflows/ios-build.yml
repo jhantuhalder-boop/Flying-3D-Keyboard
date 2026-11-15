@@ -25,5 +25,13 @@ jobs:
             -scheme Flying3DKeyboard \
             -configuration Debug \
             -sdk iphoneos \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Upload iOS App
+        uses: actions/upload-artifact@v4
+        with:
+          name: Flying3DKeyboard-Unsigned
+          path: build/Build/Products/Debug-iphoneos/*.app
+          if-no-files-found: error
